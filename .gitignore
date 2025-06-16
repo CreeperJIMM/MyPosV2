@@ -1,0 +1,6 @@
+target/
+build/
+src/main/resources/images/
+src/main/resources/imgs/
+啟動程式.bat
+pos.db
