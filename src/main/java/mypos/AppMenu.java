@@ -30,6 +30,11 @@ import models.messageBox;
 import app.MainMenuApp;
 import dao.MemberDAO;
 import java.util.Optional;
+import javafx.collections.FXCollections;
+import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.Region;
 import models.Member;
 import models.MemberDialog;
 
@@ -96,7 +101,7 @@ public class AppMenu {
         CategoryText = productManager.getCategories();
         pcm = new ProductCategoryMenu(productManager);
         for (String c : CategoryText) {
-            ScrollPane menu = pcm.get(c, true);
+            ScrollPane menu = pcm.get(c, null);
             menus.put(c, menu);
         }
     }
@@ -212,7 +217,7 @@ public class AppMenu {
     } // getMenuSelectionContainer()方法
     public void updateMenuDisplay() {
         menuContainerPane.getChildren().clear();//先刪除原有的窗格再加入新的類別窗格
-        ScrollPane menu = pcm.get(category, false);
+        ScrollPane menu = pcm.get(category, null);
         menuContainerPane.getChildren().add(menu);
         updateCheckbox();
     };
@@ -282,8 +287,28 @@ public class AppMenu {
         VBox selectMenuPane = new VBox();
         selectMenuPane.setSpacing(10);
         selectMenuPane.setPrefWidth(570);
+        //搜尋框+按鈕
+        TextField tfName = new TextField();
+        tfName.setMaxWidth(120);
+        tfName.setPrefColumnCount(30);
+        Button btnSearchName = new Button();
+        ImageView icon = new ImageView(new Image(getClass().getResourceAsStream("/images/search.png")));
+        icon.setFitWidth(18);
+        icon.setFitHeight(18);
+        btnSearchName.setGraphic(icon);
+        btnSearchName.setOnAction(e -> {
+            ScrollPane menu = pcm.get(category, tfName.getText());
+            menuContainerPane.getChildren().clear();
+            menuContainerPane.getChildren().add(menu);
+        });
+        HBox searchBar = new HBox(2);
+        searchBar.getChildren().addAll(tfName, btnSearchName);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox topBar = new HBox();
+        topBar.getChildren().addAll(getMenuSelectionContainer(), spacer, searchBar);
         //塞入菜單選擇區塊
-        selectMenuPane.getChildren().add(getMenuSelectionContainer());
+        selectMenuPane.getChildren().add(topBar);
         selectMenuPane.getChildren().add(getBrandSelectionContainer());
        // 載入資料庫
        ReloadDatabase();

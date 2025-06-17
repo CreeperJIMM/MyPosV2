@@ -22,7 +22,6 @@ import java.util.HashMap;
 import javafx.scene.control.ScrollPane;
 
 public class ProductCategoryMenu {
-
     public long lastClickTime = 0;
     HashMap<String, Image> ImgCache = MainMenuApp.ImgCache;
     TreeMap<String, Product> product_dict = null;
@@ -34,11 +33,9 @@ public class ProductCategoryMenu {
         CategoryText = productManager.getCategories();
     }
     
-    public javafx.scene.control.ScrollPane get(String category, boolean isreload) {
+    public javafx.scene.control.ScrollPane get(String category, String search) {
         //取得產品清單(呼叫靜態方法取得)
-        if (product_dict == null || isreload) {
-            product_dict = productManager.getProducts();
-        }
+        if (product_dict == null) product_dict = productManager.getProducts();
         //磁磚窗格
         TilePane category_menu = new TilePane();
         category_menu.setStyle("-fx-background-color: #D2E9FF;");
@@ -50,6 +47,9 @@ public class ProductCategoryMenu {
         for (String item_id : product_dict.keySet()) {
             //用if選擇產品類別
             if (product_dict.get(item_id).getCategory().equals(category)) {
+                if(search != null && !product_dict.get(item_id).getName().toLowerCase().contains(search.toLowerCase())) {
+                    continue;
+                }
                 String brand = product_dict.get(item_id).getBrand();
                 if (!isShowItem(brand)) {
                     continue;

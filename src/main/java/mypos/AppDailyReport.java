@@ -8,14 +8,20 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 import db.DatabaseConnection;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import javafx.application.Application;
+import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.CategoryAxis;
+import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.HBox;
@@ -74,6 +80,7 @@ public class AppDailyReport extends Application {
                      "JOIN products p ON od.product_id = p.product_id " +
                      "GROUP BY p.category " +
                      "ORDER BY p.category";
+        double total = 0.0;
         DatabaseConnection dbConn = new DatabaseConnection();
         try (Connection conn = dbConn.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
@@ -82,7 +89,10 @@ public class AppDailyReport extends Application {
                 String category = rs.getString("category");
                 double sales = rs.getDouble("sales");
                 sb.append(String.format("%s：%.0f 元\n", category, sales));
+                total += sales;
             }
+            sb.append("---------------------------\n");
+            sb.append(String.format("總共：%.0f 元\n", total));
         } catch (SQLException e) {
             sb.append("查詢失敗: ").append(e.getMessage());
         } finally {
@@ -177,6 +187,84 @@ public class AppDailyReport extends Application {
         barChart.getData().add(series);
         return barChart;
     }
+    
+    // 新增：產生每日金額長條圖
+    private LineChart<String, Number> createDailySalesLineChart() {
+        CategoryAxis xAxis = new CategoryAxis();
+        NumberAxis yAxis = new NumberAxis();
+        xAxis.setLabel("日期");
+        yAxis.setLabel("銷售金額");
+
+        LineChart<String, Number> lineChart = new LineChart<>(xAxis, yAxis);
+        lineChart.setTitle("每日銷售總額");
+        lineChart.setPrefSize(500, 650); // 可自訂長寬 (寬, 高)
+
+        XYChart.Series<String, Number> series = new XYChart.Series<>();
+        series.setName("銷售金額");
+
+        String sql = "SELECT date(order_date) AS order_date, SUM(total_amount) AS total "
+                + "FROM orders GROUP BY date(order_date) ORDER BY date(order_date) DESC";
+        
+        
+        DatabaseConnection dbConn = new DatabaseConnection();
+        try (Connection conn = dbConn.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql); ResultSet rs = stmt.executeQuery()) {
+            List<XYChart.Data<String, Number>> dataList = new ArrayList<>();
+            while (rs.next()) {
+                String date = rs.getString("order_date"); // 修正為日期欄位
+                double total = rs.getDouble("total");     // 修正為 total 欄位
+                dataList.add(new XYChart.Data<>(date, total));
+            }
+            Collections.reverse(dataList);
+            series.getData().addAll(dataList);
+        } catch (SQLException e) {
+            e.printStackTrace(); // 或自行處理錯誤顯示
+        } finally {
+            dbConn.close();
+        }
+        lineChart.getData().add(series);
+        return lineChart;
+    }
+
+    // 產生前五產品熱銷排行榜
+    private BarChart<Number, String> createTopProductsChart() {
+        CategoryAxis yAxis = new CategoryAxis();
+        NumberAxis xAxis = new NumberAxis();
+        yAxis.setLabel("產品名稱");
+        xAxis.setLabel("銷售數量");
+
+        BarChart<Number, String> barChart = new BarChart<>(xAxis, yAxis);
+        barChart.setTitle("Top 5 熱銷產品");
+        barChart.setPrefSize(500, 650);
+
+        XYChart.Series<Number, String> series = new XYChart.Series<>();
+        series.setName("熱銷商品");
+
+        String sql = "SELECT p.name, SUM(oi.quantity) AS total_sold "
+                + "FROM order_items oi "
+                + "JOIN products p ON oi.product_id = p.product_id "
+                + "GROUP BY p.name "
+                + "ORDER BY total_sold DESC "
+                + "LIMIT 5";
+
+        DatabaseConnection dbConn = new DatabaseConnection();
+        try (Connection conn = dbConn.getConnection(); PreparedStatement stmt = conn.prepareStatement(sql); ResultSet rs = stmt.executeQuery()) {
+            List<XYChart.Data<Number, String>> dataList = new ArrayList<>();
+            while (rs.next()) {
+                String name = rs.getString("name");
+                int quantity = rs.getInt("total_sold");
+                dataList.add(new XYChart.Data<>(quantity, name));
+            }
+            Collections.reverse(dataList);
+            series.getData().addAll(dataList);
+        } catch (SQLException e) {
+            e.printStackTrace(); // 建議實務上顯示錯誤提示
+        } finally {
+            dbConn.close();
+        }
+
+        barChart.getData().add(series);
+        return barChart;
+    }
 
     public VBox getRootPane() {
         // 報表標題
@@ -219,20 +307,52 @@ public class AppDailyReport extends Application {
         HBox mainHBox = new HBox(30, leftVBox, rightVBox);
         mainHBox.setAlignment(Pos.TOP_CENTER);
 
+        // 新增圖表選擇
+        ComboBox<String> chartSelector = new ComboBox<>();
+        chartSelector.getItems().addAll(
+            "各類別產品銷售金額長條圖",
+            "每日營業額折線圖",
+            "前5熱銷產品長條圖"
+        );
+        chartSelector.setValue("各類別產品銷售金額長條圖");
+        
+        chartSelector.setOnAction(e -> {
+            String selected = chartSelector.getValue();
+            barChartLabel.setText(selected);
+            switch (selected) {
+                case "每日營業額折線圖":
+                    LineChart<String, Number> newChart1 = createDailySalesLineChart();
+                    rightVBox.getChildren().clear();
+                    rightVBox.getChildren().addAll(barChartLabel, newChart1);
+                    break;
+                case "各類別產品銷售金額長條圖":
+                    BarChart<String, Number> newChart2 = createCategorySalesBarChart();
+                    rightVBox.getChildren().clear();
+                    rightVBox.getChildren().addAll(barChartLabel, newChart2);
+                    break;
+                case "前5熱銷產品長條圖":
+                    BarChart<Number, String> newChart3 = createTopProductsChart();
+                    rightVBox.getChildren().clear();
+                    rightVBox.getChildren().addAll(barChartLabel, newChart3);
+                    break;
+            }
+        });
+        
         // 新增「重新產生報表」按鈕
         Button refreshButton = new Button("重新產生報表");
         refreshButton.setOnAction(e -> {
             categorySummaryArea.setText(fetchCategorySalesSummary());
             dailySalesArea.setText(fetchDailySalesText());
-            // 重新產生 BarChart 必須要用set方法替換 才會重新繪圖
-            BarChart<String, Number> newChart = createCategorySalesBarChart();
-            rightVBox.getChildren().clear();
-            rightVBox.getChildren().addAll(barChartLabel, newChart);
+            chartSelector.getOnAction().handle(new ActionEvent());
         });
-
+        
+        HBox topBar = new HBox(200);
+        topBar.getChildren().addAll(refreshButton, chartSelector);
+        topBar.setAlignment(Pos.CENTER_RIGHT);
+        
         VBox root = new VBox(15);
         root.getChildren().addAll(
-            refreshButton,
+            topBar,
             mainHBox
         );
         root.setAlignment(Pos.CENTER);

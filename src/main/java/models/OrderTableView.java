@@ -32,7 +32,7 @@ public class OrderTableView {
 
         TableColumn<OrderDetail, Integer> priceCol = new TableColumn<>("價格");
         priceCol.setCellValueFactory(new PropertyValueFactory<>("product_price"));
-        priceCol.prefWidthProperty().bind(table.widthProperty().multiply(1.0 / 7.0));
+        priceCol.prefWidthProperty().bind(table.widthProperty().multiply(0.95 / 7.0));
         quantityCol = new TableColumn<>("數量");
         quantityCol.setEditable(true);
         quantityCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
